@@ -25,7 +25,15 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
   const supabase = await createClient();
   const [{ data: sale, error: saleError }, { data: items }, { data: payments }, { data: returns }, { data: settings }] =
     await Promise.all([
-      supabase.from("sales").select("*, customers(*), quotations(quotation_no)").eq("id", id).single(),
+      supabase
+        .from("sales")
+        // Explicitly disambiguate: there are two FK paths between sales and
+        // quotations (sales.quotation_id -> quotations.id, and
+        // quotations.converted_to_sale_id -> sales.id), so PostgREST can't
+        // infer which one is meant without naming the constraint.
+        .select("*, customers(*), quotations!sales_quotation_id_fkey(quotation_no)")
+        .eq("id", id)
+        .single(),
       supabase.from("sale_items").select("*").eq("sale_id", id).order("sort_order"),
       supabase.from("sale_payments").select("*").eq("sale_id", id).order("paid_on", { ascending: false }),
       supabase.from("sale_returns").select("*").eq("sale_id", id).order("created_at", { ascending: false }),
